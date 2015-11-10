@@ -11,11 +11,15 @@ import android.telephony.TelephonyManager;
 import android.util.Log;
 
 import java.io.File;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 public class CallRecorderService extends Service {
 
-    private MediaRecorder mediaRecorder = null;
-    private boolean isRecord = false;
+    private Map _records = new HashMap();
 
     public CallRecorderService() {
     }
@@ -28,15 +32,19 @@ public class CallRecorderService extends Service {
 
             switch (state) {
                 case TelephonyManager.CALL_STATE_IDLE:
-                    Log.i("TempLog", "CALL_STATE_IDLE");
-                    StopRecord();
+                    Log.d("TempLog", "CALL_STATE_IDLE state:" + state + ",number:" + incomingNumber);
+                    StopRecord(incomingNumber);
                     break;
                 case TelephonyManager.CALL_STATE_OFFHOOK:
-                    Log.i("TempLog", "CALL_STATE_OFFHOOK");
-                    RecordCalling(incomingNumber);
+                    Log.d("TempLog", "CALL_STATE_OFFHOOK state:" + state + ",number:" + incomingNumber);
+                    if (_records.size() == 0) {
+                        RecordCalling(incomingNumber);
+                    } else {
+                        Log.d("TempLog", "Due to other recorder is running,so current recorder can't continue.");
+                    }
                     break;
                 case TelephonyManager.CALL_STATE_RINGING:
-                    Log.i("TempLog", "CALL_STATE_RINGING");
+                    Log.d("TempLog", "CALL_STATE_RINGING state:" + state + ",number:" + incomingNumber);
                     break;
                 default:
                     break;
@@ -53,11 +61,13 @@ public class CallRecorderService extends Service {
         super.onCreate();
     }
 
-    private void StopRecord() {
-        if (isRecord) {
-            isRecord = false;
-            mediaRecorder.stop();
-            mediaRecorder.release();
+    private void StopRecord(String number) {
+        Log.d("TempLog", "stop record:" + number);
+        if (_records.containsKey(number)) {
+            Log.d("TempLog", "remove map key:" + number);
+            MediaRecorder recorder = (MediaRecorder) _records.get(number);
+            recorder.stop();
+            _records.remove(number);
         }
     }
 
@@ -68,21 +78,27 @@ public class CallRecorderService extends Service {
             File file = new File(savePath);
             if (!file.exists()) {
                 if (!file.mkdirs()) {
-                    Log.i("TempLog", "Failed to create directory");
+                    Log.d("TempLog", "Failed to create directory");
                     throw new Exception("Failed to create directory");
                 }
             }
 
-            savePath += "/[" + number + "]_" + System.currentTimeMillis() + ".amr";
+            DateFormat dtFormat = new SimpleDateFormat("yyyyMMddHHmmss");
+            String date = dtFormat.format(new Date());
 
-            mediaRecorder = new MediaRecorder();
-            mediaRecorder.setAudioSource(MediaRecorder.AudioSource.VOICE_CALL);
-            mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.AMR_NB);
-            mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
-            mediaRecorder.setOutputFile(savePath);
-            mediaRecorder.prepare();
-            mediaRecorder.start();
-            isRecord = true;
+            savePath = String.format("%s/[%s]-[%s].amr", savePath, date, number);
+
+            MediaRecorder recorder = new MediaRecorder();
+            _records.put(number, recorder);
+
+            Log.d("TempLog", "start record:" + number);
+
+            recorder.setAudioSource(MediaRecorder.AudioSource.VOICE_CALL);
+            recorder.setOutputFormat(MediaRecorder.OutputFormat.AMR_NB);
+            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+            recorder.setOutputFile(savePath);
+            recorder.prepare();
+            recorder.start();
         } catch (Exception ex) {
         }
     }

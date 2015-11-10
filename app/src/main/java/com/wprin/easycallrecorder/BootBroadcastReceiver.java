@@ -12,6 +12,6 @@ public class BootBroadcastReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         context.startService(new Intent(context, CallRecorderService.class));
-        Log.i("TempLog", "BootBroadcastReceiver");
+        Log.d("TempLog", "BootBroadcastReceiver");
     }
 }
